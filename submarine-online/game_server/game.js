@@ -27,6 +27,46 @@ function init() {
 }
 init(); // 初期化（初期化はサーバー起動時に行う
 
+const gameTicker = setInterval(() => {
+  movePlayers(gameObj.playersMap); // 潜水艦の移動
+}, 33);
+
+/**
+ * プレイヤーを移動させる関数
+ * @param {*} playersMap 
+ */
+function movePlayers(playersMap) { // 潜水艦の移動
+  for (let [playerId, player] of playersMap) {
+
+    // 撃破されているプレイヤーは対象にしない
+    if (player.isAlive === false) {
+      continue;
+    }
+
+    // 画面上で行われた操作を判別
+    switch (player.direction) {
+      case 'left':
+        player.x -= 1;
+        break;
+      case 'up':
+        player.y -= 1;
+        break;
+      case 'down':
+        player.y += 1;
+        break;
+      case 'right':
+        player.x += 1;
+        break;
+    }
+
+    // フィールドの端に達したらマップの反対側に座標を設定
+    if (player.x > gameObj.fieldWidth) player.x -= gameObj.fieldWidth;
+    if (player.x < 0) player.x += gameObj.fieldWidth;
+    if (player.y < 0) player.y += gameObj.fieldHeight;
+    if (player.y > gameObj.fieldHeight) player.y -= gameObj.fieldHeight;
+  }
+}
+
 /**
  * 新しくプレイヤーがゲームに参加し、socket接続したときの処理
  * @param {*} socketId 
@@ -103,6 +143,11 @@ function getMapData() {
   return [playersArray, itemsArray, airArray];
 }
 
+function updatePlayerDirection(socketId, direction) {
+  const playerObj = gameObj.playersMap.get(socketId);
+  playerObj.direction = direction;
+}
+
 function disconnect(socketId) {
   gameObj.playersMap.delete(socketId);
 }
@@ -142,5 +187,6 @@ function addAir() {
 module.exports = {
   newConnection,
   getMapData,
+  updatePlayerDirection,
   disconnect
 };
