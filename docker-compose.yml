@@ -1,0 +1,16 @@
+#Docker composeのバージョン指定
+version: '3'
+#サービス要素
+services:
+  #コンテナ要素 コンテナ名なので自由に命名可能
+  submarine:
+  #Dockerfileを含むディレクトリパス or GitリポジトリのURLを指定
+    build: .
+    #コンテナを起動させ続けるコマンド
+    tty: true
+    #公開用ポート ホスト：コンテナ
+    ports:
+      - 8000:8000
+    #マウントの設定 ホストとのファイル共有のパス
+    volumes:
+      - .:/submarine
