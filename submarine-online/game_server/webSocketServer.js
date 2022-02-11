@@ -11,8 +11,6 @@ function createWebSocketServer(io, game) {
     const thumbUrl = socket.handshake.query.thumbUrl;
 
     // サーバ側でイベント発火する
-    //console.log('WebSocket のコネクションがありました。');
-    //socket.emit('start data', {});
     const startObj = game.newConnection(socket.id, displayName, thumbUrl);
     socket.emit('start data', startObj);
 
@@ -22,6 +20,9 @@ function createWebSocketServer(io, game) {
   });
 
   const socketTicker = setInterval(() => {
+      // Volatile events 揮発性イベント
+      // 接続が確立されていない場合、送信されない
+      // オンラインゲーム等は接続が上手く行かなかった場合、古いデータはいらず最新のデータだけが有用なため
       rootIo.volatile.emit('map data', game.getMapData()); // 全員に送信
     },
     66);
