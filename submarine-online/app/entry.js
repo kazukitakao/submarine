@@ -11,6 +11,7 @@ const gameObj = {
   itemRadius: 4,
   airRadius: 5,
   deg: 0,
+  counter: 0,
   rotationDegreeByDirection: {
     'left': 0,
     'up': 270,
@@ -51,6 +52,10 @@ function init() {
   const submarineImage = new Image();
   submarineImage.src = '/images/submarine.png';
   gameObj.submarineImage = submarineImage;
+
+  // ミサイルの画像
+  gameObj.missileImage = new Image();
+  gameObj.missileImage.src = '/images/missile.png';
 }
 init();
 
@@ -61,10 +66,18 @@ function ticker() {
 
   if (!gameObj.myPlayerObj || !gameObj.playersMap) return;
 
-  gameObj.ctxRader.clearRect(0, 0, gameObj.raderCanvasWidth, gameObj.raderCanvasHeight); // まっさら
+  // まっさら
+  gameObj.ctxRader.clearRect(0, 0, gameObj.raderCanvasWidth, gameObj.raderCanvasHeight);
   drawRadar(gameObj.ctxRader);
   drawMap(gameObj);
   drawSubmarine(gameObj.ctxRader, gameObj.myPlayerObj);
+
+  // scoreCanvas もまっさら
+  gameObj.ctxScore.clearRect(0, 0, gameObj.scoreCanvasWidth, gameObj.scoreCanvasHeight);
+  drawAirTimer(gameObj.ctxScore, gameObj.myPlayerObj.airTime);
+  drawMissiles(gameObj.ctxScore, gameObj.myPlayerObj.missilesMany);
+
+  gameObj.counter = (gameObj.counter + 1) % 10000;
 }
 setInterval(ticker, 33);
 
@@ -113,6 +126,18 @@ function drawSubmarine(ctxRader, myPlayerObj) {
   ctxRader.restore();
 }
 
+function drawMissiles(ctxScore, missilesMany) {
+  for (let i = 0; i < missilesMany; i++) {
+    ctxScore.drawImage(gameObj.missileImage, 50 * i, 80);
+  }
+}
+
+function drawAirTimer(ctxScore, airTime) {
+  ctxScore.fillStyle = "rgb(0, 220, 250)";
+  ctxScore.font = 'bold 40px Arial';
+  ctxScore.fillText(airTime, 110, 50);
+}
+
 //websocketでデータ受信したときの処理
 /**
  * 新たにプレイヤーが参加したときの処理
@@ -143,6 +168,8 @@ socket.on('map data', (compressed) => {
     player.score = compressedPlayerData[4];
     player.isAlive = compressedPlayerData[5];
     player.direction = compressedPlayerData[6];
+    player.missilesMany = compressedPlayerData[7];
+    player.airTime = compressedPlayerData[8];
 
     gameObj.playersMap.set(player.playerId, player);
 
@@ -153,6 +180,8 @@ socket.on('map data', (compressed) => {
       gameObj.myPlayerObj.displayName = compressedPlayerData[3];
       gameObj.myPlayerObj.score = compressedPlayerData[4];
       gameObj.myPlayerObj.isAlive = compressedPlayerData[5];
+      gameObj.myPlayerObj.missilesMany = compressedPlayerData[7];
+      gameObj.myPlayerObj.airTime = compressedPlayerData[8];
     }
   }
 
@@ -184,6 +213,71 @@ function drawMap(gameObj) {
 
   // アイテムの描画
   for (let [index, item] of gameObj.itemsMap) {
+
+    // 敵プレイヤーと NPC の描画
+  for (let [key, tekiPlayerObj] of gameObj.playersMap) {
+    if (key === gameObj.myPlayerObj.playerId) { continue; } // 自分は描画しない
+
+    // 自分と他のプレイヤーの距離を求める
+    const distanceObj = calculationBetweenTwoPoints(
+      gameObj.myPlayerObj.x, gameObj.myPlayerObj.y,
+      tekiPlayerObj.x, tekiPlayerObj.y,
+      gameObj.fieldWidth, gameObj.fieldHeight,
+      gameObj.raderCanvasWidth, gameObj.raderCanvasHeight
+    );
+
+    // レーダーの範囲内に存在するプレイヤーを描画する
+    if (distanceObj.distanceX <= (gameObj.raderCanvasWidth / 2) 
+    && distanceObj.distanceY <= (gameObj.raderCanvasHeight / 2)) {
+
+      if (tekiPlayerObj.isAlive === false) {
+        continue;
+      }
+
+      const degreeDiff = calcDegreeDiffFromRadar(gameObj.deg, distanceObj.degree);
+      const toumeido = calcOpacity(degreeDiff);
+
+      const drawRadius = gameObj.counter % 12 + 2 + 12;
+      const clearRadius = drawRadius - 2;
+      const drawRadius2 = gameObj.counter % 12 + 2;
+      const clearRadius2 = drawRadius2 - 2;
+
+      gameObj.ctxRader.fillStyle = `rgba(0, 0, 255, ${toumeido})`;
+      gameObj.ctxRader.beginPath();
+      gameObj.ctxRader.arc(distanceObj.drawX, distanceObj.drawY, drawRadius, 0, Math.PI * 2, true);
+      gameObj.ctxRader.fill();
+
+      gameObj.ctxRader.fillStyle = `rgb(0, 20, 50)`;
+      gameObj.ctxRader.beginPath();
+      gameObj.ctxRader.arc(distanceObj.drawX, distanceObj.drawY, clearRadius, 0, Math.PI * 2, true);
+      gameObj.ctxRader.fill();
+
+      gameObj.ctxRader.fillStyle = `rgba(0, 0, 255, ${toumeido})`;
+      gameObj.ctxRader.beginPath();
+      gameObj.ctxRader.arc(distanceObj.drawX, distanceObj.drawY, drawRadius2, 0, Math.PI * 2, true);
+      gameObj.ctxRader.fill();
+
+      gameObj.ctxRader.fillStyle = `rgb(0, 20, 50)`;
+      gameObj.ctxRader.beginPath();
+      gameObj.ctxRader.arc(distanceObj.drawX, distanceObj.drawY, clearRadius2, 0, Math.PI * 2, true);
+      gameObj.ctxRader.fill();
+
+      gameObj.ctxRader.strokeStyle = `rgba(250, 250, 250, ${toumeido})`;
+      gameObj.ctxRader.fillStyle = `rgba(250, 250, 250, ${toumeido})`;
+      gameObj.ctxRader.beginPath();
+      gameObj.ctxRader.moveTo(distanceObj.drawX, distanceObj.drawY);
+      gameObj.ctxRader.lineTo(distanceObj.drawX + 20, distanceObj.drawY - 20);
+      gameObj.ctxRader.lineTo(distanceObj.drawX + 20 + 40, distanceObj.drawY - 20);
+      gameObj.ctxRader.stroke();
+
+
+      if (tekiPlayerObj.displayName === 'anonymous') {
+        gameObj.ctxRader.fillText('anonymous', distanceObj.drawX + 20, distanceObj.drawY - 20 - 1);
+      } else if (tekiPlayerObj.displayName) {
+        gameObj.ctxRader.fillText(tekiPlayerObj.displayName, distanceObj.drawX + 20, distanceObj.drawY - 20 - 1);
+      }
+    }
+  }
 
     // 距離情報を持ったオブジェクトを作成
     const distanceObj = calculationBetweenTwoPoints(
